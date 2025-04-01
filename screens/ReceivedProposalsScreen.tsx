@@ -16,6 +16,7 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../App';
 import { Trade, Product, User } from '../types';
+import { useAlert } from '../context/AlertContext';
 
 type ReceivedProposalsScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ReceivedProposals'>;
 
@@ -23,12 +24,22 @@ interface Props {
   navigation: ReceivedProposalsScreenNavigationProp;
 }
 
+
+const colors = {
+  primary: '#2f95dc',
+  text: '#FFFF',
+  border: '#0',
+  background: '#386ea1',
+};
+
 const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
   const [proposals, setProposals] = useState<Trade[]>([]);
   const [selectedProposal, setSelectedProposal] = useState<Trade | null>(null);
   const [rating, setRating] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const { showAlert } = useAlert();
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     const loadProposals = async () => {
@@ -47,7 +58,17 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
       setLoading(false);
     };
 
+    const loadUserData = async () => {
+      const storedUser = await AsyncStorage.getItem('currentUser');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        console.log('Usuário carregado:', userData); // Movido para dentro do useEffect
+      }
+    };
+
     loadProposals();
+    loadUserData();
   }, []);
 
   const handleAccept = async (proposal: Trade) => {
@@ -61,28 +82,27 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
     try {
       const parsedRating = parseInt(rating);
       if (isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
-        Alert.alert('Avaliação inválida', 'Por favor, insira uma nota entre 1 e 5');
+        showAlert('warning', 'Avaliação inválida', 'Por favor, insira uma nota entre 1 e 5');
         return;
       }
-
+  
       // Atualizar trades
       const allTrades = await AsyncStorage.getItem('trades');
       let updatedTrades: Trade[] = allTrades ? JSON.parse(allTrades) : [];
-
-      const proposalIndex = updatedTrades.findIndex(t => t.id === selectedProposal.id);
-      
-      // Atualizar proposta aceita
-      const acceptedTrade: Trade = {
-        ...selectedProposal,
-        status: 'accepted',
-        updatedAt: new Date().toISOString(),
-        fromUserRating: parsedRating
-      };
-
-      updatedTrades[proposalIndex] = acceptedTrade;
-
-
-
+  
+      // Encontrar e atualizar a proposta
+      updatedTrades = updatedTrades.map(trade => {
+        if (trade.id === selectedProposal.id) {
+          return {
+            ...trade,
+            status: 'accepted',
+            updatedAt: new Date().toISOString(),
+            fromUserRating: parsedRating
+          };
+        }
+        return trade;
+      });
+  
       // Atualizar status dos produtos
       const allProducts = await AsyncStorage.getItem('products');
       let updatedProducts: Product[] = allProducts ? JSON.parse(allProducts) : [];
@@ -94,7 +114,7 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
         }
         return product;
       });
-
+  
       // Cancelar outras propostas relacionadas
       updatedTrades = updatedTrades.map(trade => {
         if (trade.id !== selectedProposal.id && 
@@ -106,8 +126,8 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
             return { ...trade, status: 'canceled' };
         }
         return trade;
-    });
-
+      });
+  
       // Atualizar rating do usuário
       const users = await AsyncStorage.getItem('users');
       const allUsers: User[] = users ? JSON.parse(users) : [];
@@ -121,18 +141,19 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
         }
         return user;
       });
-
-      // Salvar alterações
-      await AsyncStorage.setItem('trades', JSON.stringify([...updatedTrades, acceptedTrade]));
+  
+      // Salvar alterações - REMOVIDO O [...updatedTrades, acceptedTrade] e usando apenas updatedTrades
+      await AsyncStorage.setItem('trades', JSON.stringify(updatedTrades));
       await AsyncStorage.setItem('products', JSON.stringify(updatedProducts));
       await AsyncStorage.setItem('users', JSON.stringify(updatedUsers));
       
       setProposals(prev => prev.filter(p => p.id !== selectedProposal.id));
       setShowRatingModal(false);
-      Alert.alert('Sucesso!', 'Troca realizada com sucesso!');
-
+      showAlert('success', 'Sucesso!', 'Troca realizada com sucesso!');
+  
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível processar a troca');
+      console.error('Erro ao processar troca:', error);
+      showAlert('error', 'Erro', 'Não foi possível processar a troca');
     }
   };
 
@@ -203,6 +224,35 @@ const ReceivedProposalsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
+      <View style={{marginTop: 0, marginBottom: 120}} >
+          <TouchableOpacity onPress={() => navigation.navigate('Home') }>
+            <Image source={ require('../assets/logo.png')} style={styles.logoImage} />
+          </TouchableOpacity>
+            {/* Exibe os dados do usuário se estiverem carregados */}
+            {user && (
+              
+              <TouchableOpacity
+                style={styles.userInfoContainer}
+                onPress={() => navigation.navigate('Profile')}
+              >
+                
+                <View style={{ marginLeft: 5 }}>
+                  <Text style={styles.userName}>{user.name}</Text>
+                  <Text style={styles.userRating}>{'⭐'.repeat(user.rating? user.rating:0)}</Text>
+                </View>
+      
+                <Image
+                  source={
+                    user.profilePicture
+                      ? { uri: user.profilePicture }
+                      : require('../assets/profile.png')
+                  }
+                  style={styles.userImage}
+                />
+              </TouchableOpacity>
+              
+            )}
+      </View>
       <FlatList
         data={proposals}
         renderItem={renderProposal}
@@ -263,7 +313,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#386ea1',
+  },
+  userInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
+  userName: {
+    fontSize: 18,
+    marginRight: 10,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  viewProfile: {
+    color: colors.primary,
+    fontSize: 14,
+  },
+  userImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+
+  logoImage: {
+    width: 40,
+    height: 42,
+    
+    position: 'absolute',
+    top: 45,
+    left: 20,
+  },
+  userInfoContainer: {
+    backgroundColor: colors.background,
+    position: 'absolute',
+    top: 40,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 5,
+    borderRadius: 0,
+    elevation: 0,
+    zIndex: 0,
+    marginBottom: 80,
+
+  },
+  userRating: {
+    fontSize: 12,
+    color: 'gray',
   },
   loadingContainer: {
     flex: 1,
@@ -337,7 +435,8 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#666',
+    color: 'white',
+    fontWeight: 'bold',
     marginTop: 20,
     fontSize: 16,
   },

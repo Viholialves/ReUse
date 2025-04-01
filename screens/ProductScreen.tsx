@@ -9,6 +9,7 @@ import { Trade, Product, User } from '../types';
 import { Picker } from '@react-native-picker/picker';
 import CurrencyInput from 'react-native-currency-input';
 import { Float } from 'react-native/Libraries/Types/CodegenTypes';
+import { useAlert } from '../context/AlertContext';
 
 type ProductScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Product'>;
 
@@ -17,6 +18,7 @@ interface ProductScreenProps {
 }
 
 // Opções de qualidade disponíveis
+
 const qualityOptions = ['Novo', 'Perfeito estado', 'Bom estado', 'Com marcas de uso'];
 
 // Estados e cidades (exemplo)
@@ -60,6 +62,7 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
   const [value, setValue] = useState<number | null>(0);
   const [city, setCity] = useState<string>('');
   const [stateField, setStateField] = useState<string>('SP');
+  const { showAlert } = useAlert();
   
 
   // Atualiza a cidade quando o estado mudar
@@ -74,14 +77,14 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
 
   const selectImage = () => {
     if (images.length >= 4) {
-      Alert.alert('Limite de 4 imagens atingido');
+      showAlert('warning', 'Atenção', 'Limite de 4 imagens atingido');
       return;
     }
     launchImageLibrary({ mediaType: 'photo' }, (response) => {
       if (response.didCancel) {
-        Alert.alert('Seleção cancelada');
+        //showAlert('error','' ,'Seleção cancelada');
       } else if (response.errorMessage) {
-        Alert.alert(response.errorMessage);
+        showAlert('error', 'Error', response.errorMessage);
       } else if (response.assets && response.assets.length > 0) {
         const uri = response.assets[0].uri;
         if (uri) {
@@ -93,14 +96,14 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
 
   const takePhoto = () => {
     if (images.length >= 4) {
-      Alert.alert('Limite de 4 imagens atingido');
+      showAlert('warning', 'Atenão', 'Limite de 4 imagens atingido');
       return;
     }
     launchCamera({ mediaType: 'photo' }, (response) => {
       if (response.didCancel) {
-        Alert.alert('Captura cancelada');
+        //Alert.alert('Captura cancelada');
       } else if (response.errorMessage) {
-        Alert.alert(response.errorMessage);
+        showAlert('error', 'Erro', response.errorMessage);
       } else if (response.assets && response.assets.length > 0) {
         const uri = response.assets[0].uri;
         if (uri) {
@@ -127,27 +130,27 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
   const handleSave = async () => {
 
     if (!name.trim()) {
-        Alert.alert('Erro', 'O nome do produto é obrigatório');
+        showAlert('error', 'Erro', 'O nome do produto é obrigatório');
         return;
       }
 
       if (description === null || description.trim() === '') {
-        Alert.alert('Erro', 'A descrição do produto é obrigatória');
+        showAlert('error', 'Erro', 'A descrição do produto é obrigatória');
         return;
       }
     
       if (value === null || value < 0) {
-        Alert.alert('Erro', 'Insira um valor válido para o produto');
+        showAlert('error', 'Erro', 'Insira um valor válido para o produto');
         return;
       }
     
       if (images.length === 0) {
-        Alert.alert('Erro', 'Adicione pelo menos uma foto do produto');
+        showAlert('error', 'Erro', 'Adicione pelo menos uma foto do produto');
         return;
       }
     
       if (!stateField || !city) {
-        Alert.alert('Erro', 'Selecione estado e cidade');
+        showAlert('error', 'Erro', 'Selecione estado e cidade');
         return;
       }
     
@@ -155,7 +158,7 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
     const currentUserStr = await AsyncStorage.getItem('currentUser');
     const currentUser = currentUserStr ? JSON.parse(currentUserStr) : null;
     if (!currentUser) {
-      Alert.alert('Usuário não autenticado');
+      showAlert('error', 'Erro', 'Usuário não autenticado');
       return;
     }
     const formattedTags = tags.join(', ');
@@ -177,24 +180,37 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
     const products: Product[] = storedProducts ? JSON.parse(storedProducts) : [];
     products.push(newProduct);
     await AsyncStorage.setItem('products', JSON.stringify(products));
-    Alert.alert('Produto adicionado');
+    showAlert('success', 'Sucesso', 'Produto adicionado');
     navigation.goBack();
   };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
 
-      <View style={styles.buttonContainer}>
-        <Button title="Selecionar Imagem" onPress={selectImage} />
-        <Button title="Tirar Foto" onPress={takePhoto} />
+      <TouchableOpacity onPress={() => navigation.navigate('Home')} >
+        <Text style={{textAlign: 'left', color: 'red', marginTop: 30, marginBottom: 50, fontWeight: 'bold'}}>Cancelar</Text>
+      </TouchableOpacity>
+
+      <Text style={{textAlign: 'center', color: 'white', fontWeight: 'bold', fontSize: 15, marginBottom: 10
+      }}>Carregue até 4 fotos do produto</Text>
+
+      <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 10 }}>
+        <TouchableOpacity onPress={selectImage} style={styles.imagePicker}>
+          <Text style={{color: 'white', fontWeight: 'bold', fontSize: 15}}>Selecionar Foto</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={takePhoto} style={styles.imageTaker}>
+          <Text style={{color: 'white', fontWeight: 'bold', fontSize: 15}}>Tirar Foto</Text>
+        </TouchableOpacity>
       </View>
+
       <ScrollView horizontal style={styles.imageContainer}>
         {images.map((uri, index) => (
           <Image key={index} source={{ uri }} style={styles.image} />
         ))}
       </ScrollView>
 
-      <Text style={styles.title}>Adicionar Produto <Text style={styles.required}>*</Text></Text>
+      <Text style={styles.title}>Informações do Produto</Text>
+      <Text style={styles.label}>Nome do Produto <Text style={styles.required}>*</Text></Text>
       <TextInput 
         placeholder="Nome do Produto"
         placeholderTextColor="gray"
@@ -210,7 +226,7 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
         placeholderTextColor="gray"
         value={description} 
         onChangeText={setDescription} 
-        style={styles.input}
+        style={styles.inputD}
       />
 
       <Text style={styles.label}>Qualidade <Text style={styles.required}>*</Text></Text>
@@ -226,7 +242,7 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
         </Picker>
       </View>
 
-      <Text style={styles.label}>Tags</Text>
+      <Text style={styles.label}>Aceito trocar por: </Text>
       <View style={styles.tagsContainer}>
         {tags.map((tag, index) => (
           <View key={index} style={styles.tag}>
@@ -289,19 +305,23 @@ const ProductScreen: React.FC<ProductScreenProps> = ({ navigation }) => {
       </View>
 
       
-      <Button title="Salvar Produto" onPress={handleSave} />
+      
+      <TouchableOpacity onPress={handleSave}>
+        <Text style={styles.save}>Salvar Produto</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { padding: 20 },
+  container: { padding: 20, backgroundColor: '#386ea1' },
   title: {
     fontSize: 22,
-    marginBottom: 10,
+    marginBottom: 30,
     textAlign: 'center',
-    color: 'black',
+    color: '#FFF',
     fontWeight: 'bold',
+
   },
   required: {
     color: 'red',
@@ -316,15 +336,56 @@ const styles = StyleSheet.create({
     marginTop: 5,
     fontSize: 12,
   },
-  input: { borderWidth: 1, marginBottom: 10, padding: 8, color: 'black' },
+  input: {
+    borderWidth: 0,
+    marginBottom: 10,
+    height: 50,
+    padding: 8,
+    color: 'black',
+    backgroundColor: 'white',
+    borderRadius: 12,
+  },
+  inputD: {
+    borderWidth: 0,
+    marginBottom: 10,
+    height: 150,
+    padding: 8,
+    color: 'black',
+    backgroundColor: 'white',
+    borderRadius: 12,
+  },
   
-  placeholder: {color: 'black'},
+  placeholder: {color: '#FFFF'},
 
-  label: { marginBottom: 5, fontWeight: 'bold', color: 'black' },
+  label: { marginBottom: 5, fontWeight: 'bold', color: '#FFF' },
   
-  pickerContainer: { borderWidth: 1, marginBottom: 10, color: 'black' },
+  pickerContainer: {
+    justifyContent: 'center',
+    borderWidth: 1,
+    marginBottom: 10,
+    padding: 8,
+    height: 50,
+    borderRadius: 12,
+    color: 'black',
+    fontFamily: 'Poppins',
+    fontSize: 16,
+    backgroundColor: 'white',
+  },
+  save: {
+    marginTop: 30,
+    marginBottom: 80,
+    color: '#386ea1',
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    fontWeight: 'bold',
+    fontSize: 20,
+    textAlign: 'center',
+    borderRadius: 21,
+    height: 80,
+    padding: 8,
+  },
   
-  picker: { height: 50, width: '100%', color: 'black' },
+  picker: { fontSize: 15, height: 50, width: '100%', color: 'black' },
   
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
   
@@ -334,6 +395,37 @@ const styles = StyleSheet.create({
   buttonContainer: { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 10 },
   imageContainer: { marginVertical: 10 },
   image: { width: 100, height: 100, marginRight: 10 },
+  imagePicker: {
+    backgroundColor: '#337ca8',
+    color: 'white',
+    fontFamily: 'Popins',
+    fontWeight: 'bold',
+    height: 80,
+    padding: 10,
+    width: 150,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopLeftRadius: 21,
+    borderBottomLeftRadius: 21,
+    borderColor: 'white',
+    borderLeftWidth: 1
+
+  },
+  imageTaker: {
+    backgroundColor: '#337ca8',
+    color: 'white',
+    fontFamily: 'Popins',
+    fontWeight: 'bold',
+    height: 80,
+    width: 150,
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderTopRightRadius: 21,
+    borderBottomRightRadius: 21,
+    borderColor: 'white',
+    borderLeftWidth: 1,
+  },
 });
 
 export default ProductScreen;

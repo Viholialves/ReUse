@@ -19,6 +19,7 @@ import { RootStackParamList} from '../App';
 import { Trade, Product, User } from '../types';
 import Modal from 'react-native-modal';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { useAlert } from '../context/AlertContext';
 
 
 
@@ -38,6 +39,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const { showAlert } = useAlert();
 
   const navigation = useNavigation();
   const { product } = route.params;
@@ -71,12 +73,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
         setUserProducts(filteredProducts);
         
         if (filteredProducts.length === 0) {
-          Alert.alert('Aviso', 'Cadastre produtos antes de trocar!');
+          showAlert('warning','Aviso', 'Cadastre produtos antes de trocar!');
           setShowTradeModal(false);
         }
       }
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao carregar produtos');
+      showAlert('error', 'Erro', 'Falha ao carregar produtos');
     } finally {
       setLoading(false);
     }
@@ -84,12 +86,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
 
   const handleSubmitTrade = async () => {
     if (!selectedProduct) {
-      Alert.alert('Selecione um item para troca');
+      showAlert('warning', 'Atenção', 'Selecione um item para troca');
       return;
     }
 
     if (product.status === 'traded') {
-      Alert.alert('Este produto já foi trocado');
+      showAlert('error', 'Erro', 'Este produto já foi trocado');
       return;
     }
   
@@ -107,10 +109,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
       const trades = existingTrades ? JSON.parse(existingTrades) : [];
       await AsyncStorage.setItem('trades', JSON.stringify([...trades, newTrade]));
       
-      Alert.alert('Sucesso', 'Proposta enviada!');
+      showAlert('success','Sucesso', 'Proposta enviada!');
       setShowTradeModal(false);
     } catch (error) {
-      Alert.alert('Erro', 'Falha ao enviar proposta');
+      showAlert('error', 'Erro', 'Falha ao enviar proposta');
     }
   };
 
@@ -119,12 +121,12 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
       console.log('Product Owner:', product.ownerEmail);
       
       if (!currentUser) {
-        Alert.alert('Erro', 'Usuário não autenticado');
+        showAlert('error', 'Erro', 'Usuário não autenticado');
         return;
       }
       
       if (currentUser.email === product.ownerEmail) {
-        Alert.alert('Aviso', 'Você é o dono deste produto');
+        showAlert('warning', 'Aviso', 'Você é o dono deste produto');
         return;
       }
       
@@ -135,7 +137,13 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
   return (
     
     <View style={styles.container}>
+      <Image source={ require('../assets/logo.png')} style={styles.logoImage} />
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.voltar} >
+          <TouchableOpacity onPress={ () => { navigation.goBack()} }>
+            <Image source={require('../assets/arrow-left.png')} style={{ width: 40, height: 40 }} />
+          </TouchableOpacity>
+        </View>
         <ScrollView horizontal pagingEnabled style={styles.imageScroll}>
           {product.images.map((uri: string, index: number) => (
             <Image key={index} source={{ uri }} style={styles.image} />
@@ -143,20 +151,21 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
         </ScrollView>
         <View style={styles.detailsContainer}>
           <Text style={styles.title}>{product.name}</Text>
-          <Text style={styles.descricao}>Descrição: {product.description}</Text>
-          <Text style={styles.text}>Qualidade: {product.quality}</Text>
-          <Text style={styles.text}>Valor: R$ {product.value}</Text>
           <Text style={styles.text}>
-            Local: {product.city} - {product.state}
+            {''}
+            {product.ownerRating ? '⭐'.repeat(product.ownerRating) : 'Anunciante Sem avaliação'}
           </Text>
-          <Text style={styles.text}>Tags: {product.tags}</Text>
-          <Text style={styles.text}>
-            Rating do anunciante:{' '}
-            {product.ownerRating ? '⭐'.repeat(product.ownerRating) : 'Sem avaliação'}
-          </Text>
-          <Text style={styles.text}>
-            Status: {product.status === 'available' ? 'Disponível para troca' : 'Trocado'}
-          </Text>
+          <Text style={styles.descricao}>{product.description}</Text>
+          <Text style={styles.text}>{product.quality}</Text>
+          <Text style={styles.text}>R$ {product.value}</Text>
+          <Text style={styles.text}>Tags de interesse do usuário:</Text>
+          <View style={styles.tagsContainer}>
+            {product.tags.map((tag, index) => (
+            <View key={index} style={styles.tag}>
+              <Text style={styles.tagText}>{tag}</Text>
+            </View>
+            ))}
+          </View>
         </View>
       </ScrollView>
       {/* Só exibe o botão se o usuário logado não for o dono do anúncio */}
@@ -175,7 +184,7 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
             style={styles.closeButton}
             onPress={() => setShowTradeModal(false)}
           >
-            <Icon name="close" size={24} color="#333" />
+            <Image source={ require('../assets/cancel.png')} style={{ height: 20, width: 20 }} />
           </TouchableOpacity>
 
           <Text style={styles.modalTitle}>Selecione seu item para troca</Text>
@@ -229,6 +238,10 @@ const ProductDetailScreen: React.FC<ProductDetailScreenProps> = ({ route }) => {
 };
 
 const styles = StyleSheet.create({
+  tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 10 },
+  
+  tag: { backgroundColor: '#ddd', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, flexDirection: 'row', alignItems: 'center', marginRight: 5, marginBottom: 5 },
+  tagText: { marginRight: 4, color: 'black' },
   modal: {
     justifyContent: 'flex-end',
     margin: 0,
@@ -239,6 +252,14 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     minHeight: '50%',
+  },
+  logoImage: {
+    width: 40,
+    height: 42,
+    
+    position: 'absolute',
+    top: 45,
+    left: 20,
   },
   closeButton: {
     alignSelf: 'flex-end',
@@ -287,18 +308,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  voltar: {
+    justifyContent: 'flex-end',
+    marginTop: 45,
+    fontSize: 16,
+    alignItems: 'flex-end',
+    right: 10,
+
+    marginBottom: 20,
+
+  },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  container: { flex: 1, backgroundColor: 'white' },
+  container: { flex: 1, backgroundColor: '#333' },
   scrollContainer: { paddingBottom: 80 },
   imageScroll: { height: 250 },
-  image: { width, height: 250, resizeMode: 'cover' },
+  image: { width, height: 250, resizeMode: 'contain',},
   detailsContainer: { padding: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', color: 'black', marginBottom: 10 },
-  descricao: { fontSize: 18, color: 'black', marginBottom: 10 },
-  text: { fontSize: 16, color: 'black', marginBottom: 5 },
+  title: { fontSize: 24, fontWeight: 'bold', color: 'white', marginBottom: 10 },
+  descricao: { fontSize: 18, color: 'white', marginBottom: 10 },
+  text: { fontSize: 16, color: 'white', marginBottom: 5 },
   tradeButton: {
     position: 'absolute',
     bottom: 20,
